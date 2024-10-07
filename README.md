@@ -7,3 +7,4 @@ An interactive web-based tool for visualizing the behavior of a single neural ne
 - Adjustable number of neurons
 - Interactive weight and bias sliders
 - Multiple activation functions
+- Style
