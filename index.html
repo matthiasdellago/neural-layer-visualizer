@@ -3,28 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neural Layer Visualizer</title>
+    <title>Retro-Futuristic Neural Layer Visualizer</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.24.2/plotly.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-color: #001a33;
+            --text-color: #00ffcc;
+            --border-color: #00ffcc;
+            --slider-bg: #005f73;
+        }
         body {
-            font-family: 'Roboto', sans-serif;
+            font-family: 'VT323', monospace;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #2c3e50;
-            color: #ecf0f1;
-        }
-        h1 {
-            text-align: center;
         }
         #plot {
             width: 100%;
             height: 400px;
-            background-color: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
+            background-color: rgba(0, 26, 51, 0.5);
+            border: 2px solid var(--border-color);
             overflow: hidden;
             margin-bottom: 20px;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.2);
         }
         .controls {
             display: flex;
@@ -35,30 +39,29 @@
         .column {
             flex: 1;
             min-width: 200px;
-            background-color: rgba(255, 255, 255, 0.1);
+            background-color: rgba(0, 26, 51, 0.5);
             padding: 15px;
-            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .column h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: var(--text-color);
+            text-shadow: 0 0 5px rgba(0, 255, 204, 0.5);
         }
         label {
             display: inline-block;
             margin-right: 10px;
             font-weight: 300;
         }
-        #neuronCount {
-            width: 60px;
+        #neuronCount, #activationFunction {
+            width: 100px;
             padding: 5px;
-            border: none;
-            border-radius: 4px;
-            background-color: #34495e;
-            color: #ecf0f1;
-        }
-        #activationFunction {
-            width: 150px;
-            padding: 5px;
-            border: none;
-            border-radius: 4px;
-            background-color: #34495e;
-            color: #ecf0f1;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'VT323', monospace;
+            font-size: 16px;
         }
         .slider-container {
             display: flex;
@@ -71,8 +74,7 @@
             -webkit-appearance: none;
             width: 100%;
             height: 5px;
-            border-radius: 5px;
-            background: #34495e;
+            background: var(--slider-bg);
             outline: none;
         }
         input[type="range"]::-webkit-slider-thumb {
@@ -80,40 +82,62 @@
             appearance: none;
             width: 15px;
             height: 15px;
-            border-radius: 50%;
-            background: #3498db;
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 15px;
+            height: 15px;
+            cursor: pointer;
+        }
+        input[type="range"]::-ms-thumb {
+            width: 15px;
+            height: 15px;
             cursor: pointer;
         }
         .value-input {
             width: 60px;
             padding: 5px;
             margin-left: 10px;
-            border: 1px solid #3498db;
-            border-radius: 4px;
-            background-color: #34495e;
-            color: #ecf0f1;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-color);
+            color: var(--text-color);
             text-align: center;
+            font-family: 'VT323', monospace;
+            font-size: 16px;
         }
         .network-config-container {
-            background-color: rgba(255, 255, 255, 0.1);
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 20px;
+        }
+        .network-config-item {
+            display: flex;
+            align-items: center;
+        }
+        #formula {
+            text-align: center;
+            font-size: 1.2em;
+            font-family: 'VT323', monospace;
+            white-space: pre-wrap;
+            text-shadow: 0 0 5px rgba(0, 255, 204, 0.5);
+            margin-bottom: 20px;
+        }
+        .latex-label {
+            min-width: 30px;
+            display: inline-block;
         }
     </style>
 </head>
 <body>
-    <h1>Neural Layer Visualizer</h1>
+    <div id="formula"></div>
     <div id="plot"></div>
     <div class="network-config-container">
-        <div>
+        <div class="network-config-item">
             <label for="neuronCount">Number of neurons:</label>
             <input type="number" id="neuronCount" min="1" max="10" value="3">
         </div>
-        <div>
+        <div class="network-config-item">
             <label for="activationFunction">Activation Function:</label>
             <select id="activationFunction">
                 <option value="relu" selected>ReLU</option>
@@ -144,65 +168,114 @@
         };
 
         let currentActivation = activationFunctions.relu;
+        let currentActivationName = 'ReLU';
 
         const networkOutput = (x, params) =>
-            params.w.reduce((sum, wi, i) => sum + wi * currentActivation(x + params.b[i]), 0);
+            params.w.reduce((sum, wi, i) => sum + currentActivation(wi * x + params.b[i]), 0);
 
         const xValues = Array.from({length: 201}, (_, i) => -10 + i * 0.1);
+
+        const randomInitialize = count => Array.from({length: count}, () => parseFloat((Math.random() * 4 - 2).toFixed(2)));
+
         let params = {
-            w: [-0.81, 1.89, -2.70],
-            b: [8.44, 3.03, -5.07]
+            w: randomInitialize(3),
+            b: randomInitialize(3)
         };
-        const colors = ['#3498db', '#2ecc71', '#e74c3c', '#f39c12', '#9b59b6'];
+
+        const colors = ['#ff8c00', '#ff00ff', '#00ff00', '#00ffff', '#ff1493', '#7fff00', '#ff69b4', '#1e90ff'];
+
+        function updateFormula() {
+            const neuronCount = params.w.length;
+            let formulaStr = `<span style="color: ${colors[0]}">y(x) = </span>`;
+            for (let i = 0; i < neuronCount; i++) {
+                const color = colors[(i+1) % colors.length];
+                formulaStr += `<span style="color: ${color}">${currentActivationName}(w${i+1}*x + b${i+1})</span>`;
+                if (i < neuronCount - 1) formulaStr += ' + ';
+            }
+            document.getElementById('formula').innerHTML = formulaStr;
+        }
 
         function updatePlot() {
             const traces = [
                 {
                     x: xValues,
                     y: xValues.map(x => networkOutput(x, params)),
-                    name: 'Layer Output',
+                    name: 'y',
                     line: { color: colors[0], width: 3 }
                 },
                 ...params.w.map((_, i) => ({
                     x: xValues,
-                    y: xValues.map(x => params.w[i] * currentActivation(x + params.b[i])),
+                    y: xValues.map(x => currentActivation(params.w[i] * x + params.b[i])),
                     name: `Neuron ${i+1}`,
                     line: { color: colors[(i+1) % colors.length], dash: 'dash', width: 2 }
                 }))
             ];
 
             Plotly.react('plot', traces, {
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                xaxis: { title: 'Input', range: [-10, 10], gridcolor: '#888', zerolinecolor: '#888' },
-                yaxis: { title: 'Output', range: [-10, 10], gridcolor: '#888', zerolinecolor: '#888' },
+                paper_bgcolor: 'rgba(0,26,51,0)',
+                plot_bgcolor: 'rgba(0,26,51,0)',
+                xaxis: { 
+                    title: 'Input', 
+                    range: [-10, 10], 
+                    gridcolor: '#005f73', 
+                    zerolinecolor: '#005f73',
+                    dtick: 1
+                },
+                yaxis: { 
+                    title: 'Output', 
+                    range: [-2, 8], 
+                    gridcolor: '#005f73', 
+                    zerolinecolor: '#005f73',
+                    dtick: 1
+                },
                 showlegend: true,
                 legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, xanchor: 'right', x: 1 },
-                font: { color: '#ecf0f1' }
+                font: { color: '#00ffcc', family: 'VT323, monospace' },
+                margin: { t: 10, b: 40, l: 50, r: 10 }
             });
+
+            updateFormula();
         }
 
-        function createSlider(container, id, min, max, value, label) {
+        function createSlider(container, id, min, max, value, label, color) {
             const sliderContainer = document.createElement('div');
             sliderContainer.className = 'slider-container';
             sliderContainer.innerHTML = `
-                <label for="${id}">${label}:</label>
+                <span class="latex-label" style="color: ${color}">${label}:</span>
                 <input type="range" id="${id}" min="${min}" max="${max}" step="0.01" value="${value}">
-                <input type="text" class="value-input" id="${id}-input" value="${value}">
+                <input type="text" class="value-input" id="${id}-input" value="${value}" style="color: ${color}">
             `;
             container.appendChild(sliderContainer);
 
             const inputRange = sliderContainer.querySelector('input[type="range"]');
             const inputText = sliderContainer.querySelector('.value-input');
 
-            function updateValue(newValue) {
+            // Set the color of the slider button
+            const style = document.createElement('style');
+            style.textContent = `
+                #${id}::-webkit-slider-thumb {
+                    background-color: ${color};
+                    box-shadow: 0 0 5px ${color};
+                }
+                #${id}::-moz-range-thumb {
+                    background-color: ${color};
+                    box-shadow: 0 0 5px ${color};
+                }
+                #${id}::-ms-thumb {
+                    background-color: ${color};
+                    box-shadow: 0 0 5px ${color};
+                }
+            `;
+            document.head.appendChild(style);
+
+            const updateValue = newValue => {
                 const value = parseFloat(newValue).toFixed(2);
                 inputRange.value = value;
                 inputText.value = value;
                 const [type, index] = id.split('-');
                 params[type][index] = parseFloat(value);
                 updatePlot();
-            }
+            };
 
             inputRange.oninput = () => updateValue(inputRange.value);
             inputText.onchange = () => updateValue(inputText.value);
@@ -225,15 +298,14 @@
             params.b = params.b.slice(0, count);
 
             while (params.w.length < count) {
-                params.w.push(parseFloat((Math.random() * 2 - 1).toFixed(2)));
-            }
-            while (params.b.length < count) {
-                params.b.push(parseFloat((Math.random() * 2 - 1).toFixed(2)));
+                params.w.push(parseFloat((Math.random() * 4 - 2).toFixed(2)));
+                params.b.push(parseFloat((Math.random() * 4 - 2).toFixed(2)));
             }
 
             for (let i = 0; i < count; i++) {
-                createSlider(weightColumn, `w-${i}`, -10, 10, params.w[i], `w${i+1}`);
-                createSlider(biasColumn, `b-${i}`, -10, 10, params.b[i], `b${i+1}`);
+                const color = colors[(i+1) % colors.length];
+                createSlider(weightColumn, `w-${i}`, -10, 10, params.w[i], `w${i+1}`, color);
+                createSlider(biasColumn, `b-${i}`, -10, 10, params.b[i], `b${i+1}`, color);
             }
 
             slidersDiv.appendChild(weightColumn);
@@ -245,6 +317,7 @@
         document.getElementById('neuronCount').addEventListener('input', updateNeuronCount);
         document.getElementById('activationFunction').addEventListener('change', function() {
             currentActivation = activationFunctions[this.value];
+            currentActivationName = this.options[this.selectedIndex].text;
             updatePlot();
         });
 
